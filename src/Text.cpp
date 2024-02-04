@@ -55,7 +55,7 @@ namespace mono {
         fseek(file, 0, SEEK_SET);
 
         // Allocate memory for the buffer
-        Text = (char *)realloc(Text, Capacity*sizeof(Text));  // +1 for null terminator
+        Text = (char *)realloc(Text, (Capacity + 1)*sizeof(Text));  // +1 for null terminator
         if (Text == NULL) {
             perror("Memory allocation error");
             fclose(file);
@@ -80,7 +80,29 @@ namespace mono {
         fclose(file);
     }
 
-    void Buffer::write_file(const char *file_name) {}
+    void Buffer::write_file(const char *file_name) {
+        FILE *file = fopen(file_name, "wb");
+        if (file == NULL) {
+            perror("Error opening file");
+            exit(1);
+        }
+
+        // Get the file size
+        fseek(file, 0, SEEK_END);
+        Capacity = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        
+        size_t bytesWrite = fwrite(Text, 1, Count - 1, file);
+        std::cout<<bytesWrite<<" "<<Count<<std::endl;
+        if (bytesWrite != Count - 1) {
+            perror("Error writing file");
+            fclose(file);
+            free(Text);
+            exit(1);
+        }
+        // Close the file and free the memory
+        fclose(file);
+    }
     
     Buffer::Buffer() {
         alloc();

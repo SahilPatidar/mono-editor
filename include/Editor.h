@@ -76,8 +76,14 @@ public:
     void insert(char *Buf, size_t Len, int &Cursor);
     void deleteChar(int &Cursor);
     void backSpace(int &Cursor);
-    inline char operator[](int i) {
-        return Text[i];
+    inline char operator[](size_t I) {
+        assert(I < getCount() && " I is greater than Count");
+        return Text[I];
+    }
+
+    inline char getChar(size_t I) const noexcept {
+        assert(I < getCount() && " I is greater than Count");
+        return Text[I];
     }
 
     inline int getCount() const noexcept { return strlen(Text); }
@@ -123,7 +129,6 @@ public:
     void MoveCursorCharNextLine();
     void MoveCursorCharPrevLine();
     void ReToknize();
-    size_t getRow();
 
     void RenderText(TextRenderer &Renderer, size_t row, TTF_Font *Font);
     void RenderChar(TextRenderer &R, char c, Vec2 &Pos, TTF_Font *Font, SDL_Color &Color);
@@ -142,9 +147,26 @@ public:
     inline void setCursor(int x) noexcept { Cursor = x; }
 
     void RenderTextLines(TextRenderer &Renderer, TTF_Font *Font);
+    size_t getRow(int Cursor);
     int getCursorRow() const noexcept { return CursorRow; }
     int getCursorCol() const noexcept { return CursorCol; }
     void CalcCursorPos();
+    void CopyClip();
+    void PasteClip();
+    void saveBufToSource() noexcept { 
+        Buf.write_file(filePath);
+    }
+    void setSelecting() noexcept { 
+        Selecting = !Selecting;
+        setSelectMark();
+    }
+    void setSelectMark() noexcept { 
+        SelectedMark = Selecting?Cursor:-1; 
+        MarkedRow = CursorRow;
+    }
+    inline int getSelectMark() const noexcept { 
+        return SelectedMark; 
+    }
     void init();
 private:
     Lines TextLines;
@@ -153,7 +175,10 @@ private:
     int Cursor{0};
     int CursorRow{0};
     int CursorCol{0};
+    int SelectedMark{-1};
+    int MarkedRow{-1};
     Buffer Buf;
+    String TempBuf;
     const char *filePath;
 };  
 

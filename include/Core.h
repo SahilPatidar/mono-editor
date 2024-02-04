@@ -36,6 +36,7 @@ namespace mono {
     void *CheckP(void *p);
     
     using StringRef = std::string_view;
+    using String = std::string;
     template<typename T> using List = std::list<T>;
     template<typename T> using Vector = std::vector<T>;
 }

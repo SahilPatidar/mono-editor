@@ -41,7 +41,7 @@ void Editor::ReToknize() {
     TextLines.put(line);
 }
 
-size_t Editor::getRow() {
+size_t Editor::getRow(int Cursor) {
     assert(TextLines.getLineCount() > 0);
     for (size_t row = 0; row < TextLines.getLineCount(); ++row) {
         Line line = TextLines.get(row);
@@ -154,6 +154,31 @@ void Editor::MoveCursorCharPrevLine() {
 }
 
 
+void Editor::CopyClip() {
+    if (!Selecting) {
+        return;
+    }
+    size_t CopyStart = SelectedMark > Cursor? Cursor: SelectedMark; 
+    size_t CopyEnd = SelectedMark > Cursor? SelectedMark: Cursor; 
+    if (CopyStart < CopyEnd) {
+        TempBuf.clear();
+        for (size_t I = CopyStart; I < CopyEnd; ++I) {
+            TempBuf.push_back(Buf.getChar(I));
+        }
+    }
+}
+
+
+void Editor::PasteClip() {
+    if(TempBuf.empty()) {
+        return;
+    }
+    std::cout<<TempBuf<<std::endl;
+    Buf.insert((char*)TempBuf.c_str(), TempBuf.size(), Cursor);
+    ReToknize();
+}
+
+
 void Editor::RenderChar(TextRenderer &R, char c, Vec2 &Pos, TTF_Font *Font, SDL_Color &Color) {
     //Render text surface
     // SDL_Surface* TextSurface = TTF_RenderText_Solid( Font, c, Color );
@@ -197,16 +222,54 @@ void Editor::RenderText(TextRenderer &Renderer, size_t row, TTF_Font *Font) {
     
 }
 
+
 void Editor::RenderTextLines(TextRenderer &Renderer, TTF_Font *Font) {
-    std::cout<<TextLines.getLineCount()<<std::endl;
-    for (size_t row = 0, size = TextLines.getLineCount(); row < size; ++row) {
-        RenderText(Renderer, row, Font);
+
+    /// Render Selecting
+    {
+        if (Selecting) {
+            // Renderer.SetRenderDrawColor(.25, .25, .25, 1);
+            Renderer.SetRenderDrawColor(9, 125, 5, 11);
+            int FW = FONT_WIDTH * FONT_SCALE;
+            int FH = FONT_HEIGHT * FONT_SCALE;
+            int MarkedCursor = SelectedMark;
+            size_t SelectBeginRow = CursorRow <= MarkedRow?CursorRow: MarkedRow;
+            size_t SelectEndRow = CursorRow >= MarkedRow?CursorRow: MarkedRow;
+            for( size_t row = SelectBeginRow; row <= SelectEndRow; ++row) {
+                Line TLine = TextLines.get(row);
+                size_t SelectStartCursor = Cursor;
+                size_t SelectEndCursor = MarkedCursor;
+                if (SelectEndCursor < SelectStartCursor) {
+                    size_t t = SelectEndCursor;
+                    SelectEndCursor = SelectStartCursor;
+                    SelectStartCursor = t;
+                }
+
+                if (SelectStartCursor < TLine.begin) { 
+                    SelectStartCursor = TLine.begin;
+                }
+                
+                if (SelectEndCursor > TLine.end) {
+                    SelectEndCursor = TLine.end;   
+                }
+                if (SelectStartCursor <= SelectEndCursor) {
+                    int MarkedCursorCol = SelectStartCursor - TLine.begin;
+                    int SelectedWidth = SelectEndCursor - SelectStartCursor;
+                    SDL_Rect Rect = { 
+                        .x = FW * MarkedCursorCol,
+                        .y = FH * (int)row,
+                        .w = FW * SelectedWidth,
+                        .h = FH, 
+                        };
+                    Renderer.RenderFillRect(&Rect);
+                }
+
+            }
+        }
     }
 
     /// Render Cursor
     {
-        // int CursorCol = Cursor - TextLines.getBegin(LineCount);
-        // int CursorRow = LineCount;
         SDL_Rect Rect = { 
             .x = FONT_WIDTH * CursorCol * FONT_SCALE,
             .y = CursorRow * FONT_HEIGHT * FONT_SCALE,
@@ -220,6 +283,10 @@ void Editor::RenderTextLines(TextRenderer &Renderer, TTF_Font *Font) {
                 255
             );
         Renderer.RenderFillRect(&Rect);
+    }
+
+    for (size_t row = 0, size = TextLines.getLineCount(); row < size; ++row) {
+        RenderText(Renderer, row, Font);
     }
 }
 
@@ -247,6 +314,11 @@ bool run(char *FilePath) {
             {
               switch (Event.key.keysym.sym)
               {
+                case SDLK_TAB:
+                {
+                    E.InsertChar(' ');
+                }
+                    break;
                 case SDLK_UP:
                 {
                     E.MoveCursorCharPrevLine();
@@ -259,7 +331,7 @@ bool run(char *FilePath) {
                     break;
                 case SDLK_LEFT:
                 {
-                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                    if (Event.key.keysym.mod & KMOD_ALT) {
                         E.MoveCursorWordLeft();
                     } else {
                         E.MoveCursorCharLeft();
@@ -268,7 +340,7 @@ bool run(char *FilePath) {
                     break;
                 case SDLK_RIGHT:
                 {
-                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                    if (Event.key.keysym.mod & KMOD_ALT) {
                         E.MoveCursorWordRight();
                     } else {
                         E.MoveCursorCharRight();
@@ -285,9 +357,35 @@ bool run(char *FilePath) {
                    E.InsertChar('\n');
                 }
                     break;
+                case SDLK_m:
+                {
+                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                        std::cout<<"----"<<"Selecting"<<"---"<<std::endl;
+                        E.setSelecting();                
+
+                    } 
+                }
+                    break;
+                case SDLK_c:
+                {
+                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                        E.CopyClip();
+                    } 
+                }
+                    break;
+                case SDLK_v:
+                {
+                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                        E.PasteClip();
+                    } 
+                }
+                    break;
                 case SDLK_s:
                 {
                     ///save file to source
+                    if (Event.key.keysym.mod & KMOD_CTRL) {
+                        E.saveBufToSource();
+                    } 
                 }
                     break;
                 default:
@@ -297,6 +395,7 @@ bool run(char *FilePath) {
             break;
             case SDL_TEXTINPUT:
             {
+                std::cout<<"----"<<Event.text.text<<"---"<<std::endl;
                char *text = Event.text.text;
                size_t text_len = strlen(text);
                 for (size_t i = 0; i < text_len; ++i) {
@@ -309,11 +408,11 @@ bool run(char *FilePath) {
             }
         }
 
+        E.CalcCursorPos();
         R.SetRenderDrawColor( 0, 0, 0, 0xFF );
         R.SetRenderClear();
         E.RenderTextLines(R, Font);
         R.RenderPresent();
-        E.CalcCursorPos();
     }
     TTF_Quit();
 }
