@@ -3,7 +3,7 @@
 
 namespace mono {
 
-    void Buffer::insert(char *Buf, size_t Len, int &Cursor) {
+    void Buffer::insert(char *Buf, size_t Len, size_t &Cursor) {
         for (size_t i = 0; i < Len; i++) {
             append('\0');
         }
@@ -17,7 +17,7 @@ namespace mono {
     }
 
 
-    void Buffer::deleteChar(int &Cursor) {
+    void Buffer::deleteChar(size_t &Cursor) {
         if (Cursor >= Count) return;
         memmove(
             &Text[Cursor],
@@ -27,7 +27,7 @@ namespace mono {
         --Count; 
     }
 
-    void Buffer::backSpace(int &Cursor) {
+    void Buffer::backSpace(size_t &Cursor) {
         if (Cursor > Count) {
             Cursor = Count;
         }
@@ -93,7 +93,7 @@ namespace mono {
         fseek(file, 0, SEEK_SET);
         
         size_t bytesWrite = fwrite(Text, 1, Count - 1, file);
-        std::cout<<bytesWrite<<" "<<Count<<std::endl;
+        std::cout<< " Byte Write -> " << bytesWrite << " Count-> " <<Count<<std::endl;
         if (bytesWrite != Count - 1) {
             perror("Error writing file");
             fclose(file);

@@ -30,7 +30,7 @@ void Editor::ReToknize() {
     TextLines.clear();
     Line line;
     line.begin = 0;
-    for (int  i = 0; i < Buf.getCount(); ++i) {
+    for (size_t i = 0; i < Buf.getCount(); ++i) {
         if(Buf[i] == '\n') {
             line.end = i;
             TextLines.put(i, line);
@@ -41,7 +41,7 @@ void Editor::ReToknize() {
     TextLines.put(line);
 }
 
-size_t Editor::getRow(int Cursor) {
+size_t Editor::getRow(size_t Cursor) {
     assert(TextLines.getLineCount() > 0);
     for (size_t row = 0; row < TextLines.getLineCount(); ++row) {
         Line line = TextLines.get(row);
@@ -213,15 +213,14 @@ void Editor::RenderText(TextRenderer &Renderer, size_t row, TTF_Font *Font) {
     size_t end = TextLines.getEnd(row);
     /// Render Text
     {
-        SDL_Color Color = { 25, 123, 54, 255 };
-        Pos.y = row * FONT_HEIGHT * FONT_SCALE;
-        for (size_t i = begin; i < end; i++) {
+        SDL_Color Color = { 0, 225, 0, 255 };
+        Pos.y = static_cast<int>(row - WindowBlock.RowStart) * FONT_HEIGHT * FONT_SCALE;
+        for (size_t i = begin + WindowBlock.ColStart; i < end; i++) {
             RenderChar(Renderer,  Buf[i], Pos, Font, Color);
         }
     }
     
 }
-
 
 void Editor::RenderTextLines(TextRenderer &Renderer, TTF_Font *Font) {
 
@@ -229,7 +228,7 @@ void Editor::RenderTextLines(TextRenderer &Renderer, TTF_Font *Font) {
     {
         if (Selecting) {
             // Renderer.SetRenderDrawColor(.25, .25, .25, 1);
-            Renderer.SetRenderDrawColor(9, 125, 5, 11);
+            Renderer.SetRenderDrawColor(0, 0, 150, 11);
             int FW = FONT_WIDTH * FONT_SCALE;
             int FH = FONT_HEIGHT * FONT_SCALE;
             int MarkedCursor = SelectedMark;
@@ -270,22 +269,23 @@ void Editor::RenderTextLines(TextRenderer &Renderer, TTF_Font *Font) {
 
     /// Render Cursor
     {
-        SDL_Rect Rect = { 
-            .x = FONT_WIDTH * CursorCol * FONT_SCALE,
-            .y = CursorRow * FONT_HEIGHT * FONT_SCALE,
-            .w = FONT_WIDTH * FONT_SCALE,
+        Uint32 CURSOR_BLINK_THRESHOLD = 200;
+        Uint32 CURSOR_BLINK_PERIOD = 600;
+        uint32_t t = SDL_GetTicks() - LastStroke;
+        if (t < CURSOR_BLINK_THRESHOLD || t/CURSOR_BLINK_PERIOD%2 != 0) {
+          SDL_Rect Rect = { 
+            .x = static_cast<int>(CursorCol - WindowBlock.ColStart) * FONT_WIDTH * FONT_SCALE,
+            .y = static_cast<int>(CursorRow - WindowBlock.RowStart) * FONT_HEIGHT * FONT_SCALE,
+            .w = 2,
             .h = FONT_HEIGHT * FONT_SCALE, 
-            };
-        Renderer.SetRenderDrawColor(
-                255, 
-                255, 
-                255, 
-                255
-            );
-        Renderer.RenderFillRect(&Rect);
+          };
+          Renderer.SetRenderDrawColor(0, 0, 255, 200);
+          Renderer.RenderFillRect(&Rect);
+        }
     }
 
-    for (size_t row = 0, size = TextLines.getLineCount(); row < size; ++row) {
+// render_text:
+    for (size_t row = WindowBlock.RowStart, size = TextLines.getLineCount(); row < size; ++row) {
         RenderText(Renderer, row, Font);
     }
 }
@@ -322,11 +322,13 @@ bool run(char *FilePath) {
                 case SDLK_UP:
                 {
                     E.MoveCursorCharPrevLine();
+                    E.LastStroke = SDL_GetTicks();
                 }
                     break;
                 case SDLK_DOWN:
                 {
                     E.MoveCursorCharNextLine();
+                    E.LastStroke = SDL_GetTicks();
                 }
                     break;
                 case SDLK_LEFT:
@@ -336,6 +338,7 @@ bool run(char *FilePath) {
                     } else {
                         E.MoveCursorCharLeft();
                     }
+                    E.LastStroke = SDL_GetTicks();
                 }
                     break;
                 case SDLK_RIGHT:
@@ -345,11 +348,13 @@ bool run(char *FilePath) {
                     } else {
                         E.MoveCursorCharRight();
                     }
+                    E.LastStroke = SDL_GetTicks();
                 }
                     break;
                 case SDLK_BACKSPACE:
                 {
                    E.BackSpace();
+                   E.LastStroke = SDL_GetTicks();
                 }
                     break;
                 case SDLK_RETURN:
@@ -395,13 +400,12 @@ bool run(char *FilePath) {
             break;
             case SDL_TEXTINPUT:
             {
-                std::cout<<"----"<<Event.text.text<<"---"<<std::endl;
                char *text = Event.text.text;
                size_t text_len = strlen(text);
                 for (size_t i = 0; i < text_len; ++i) {
                     E.InsertChar(text[i]);
                 }
-                int LastStroke = SDL_GetTicks();
+                E.LastStroke = SDL_GetTicks();
             }
             default:
                 break;
@@ -409,6 +413,8 @@ bool run(char *FilePath) {
         }
 
         E.CalcCursorPos();
+        E.CalcWindowStartPos();
+        E.CalcWindowColStartPos();
         R.SetRenderDrawColor( 0, 0, 0, 0xFF );
         R.SetRenderClear();
         E.RenderTextLines(R, Font);
