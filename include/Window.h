@@ -1,26 +1,30 @@
 #pragma once
-#include"SDL.h"
-#include"SDL_video.h"
+#include "SDL.h"
+#include "SDL_video.h"
 
 namespace mono {
 
 class SDLWindow {
 public:
-    inline SDL_Window *getWindow() const noexcept { return Window; }
+  inline SDL_Window *getWindow() const noexcept { return Window; }
+  inline void getWindowSize(int &w, int &h) const noexcept {
+    SDL_GetWindowSize(Window, &w, &h);
+  }
 
-    static SDLWindow Create();
+  static SDLWindow Create();
 
-    // Window(SDL_Window *_Window, SDL_Renderer *_Renderer);
-    SDLWindow(SDL_Window *_Window);
-    ~SDLWindow();
+  // Window(SDL_Window *_Window, SDL_Renderer *_Renderer);
+  SDLWindow(SDL_Window *_Window);
+  ~SDLWindow();
+
 private:
-    void CloseWindow() {
-        if(Window)
-            SDL_DestroyWindow(Window);
-        Window = NULL;
-        SDL_Quit();
-    }
-    SDL_Window *Window;
+  void CloseWindow() {
+    if (Window)
+      SDL_DestroyWindow(Window);
+    Window = NULL;
+    SDL_Quit();
+  }
+  SDL_Window *Window;
 };
 
-}
+} // namespace mono
